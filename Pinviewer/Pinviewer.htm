@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html>
+<head>
+
+<!--
+Pinviewer for external Board for Colorlight i9 v7.2
+ALPHA VERSION! - INCOMPLETE! - Feedback welcome
+
+(c) 2024 by kittennbfive - CC BY-NC-SA 4.0
+
+https://github.com/kittennbfive
+-->
+
+<meta charset="utf-8" />
+<title>Colorlight i9 Pinviewer</title>
+<style>
+body { font-family:sans-serif; height:100%; }
+.header { font-size:150%; font-weight:bold; text-align:center; margin-bottom:5px; }
+.js_off { color:red; margin-top:10px; margin-bottom:15px; }
+.main { position:relative; }
+.left { float:left; }
+.board { position:relative; width:100%; height:100%; }
+.con_macro { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); }
+.right { float:left; margin-left:20px; height:100%; }
+.details { height:80%; margin-bottom: 200px; }
+.control { height:20%; }
+.control,input { margin-right:10px; margin-bottom:5px; }
+.title { font-size:120%; text-align:center; margin-bottom:5px; }
+table td { padding-right:10px;}
+.con_zoom_table { font-size:140%; text-align:center; border-collapse:collapse; border:solid; border-width:1px;}
+.table_diff_details { font-size:80%; }
+.footer { position:absolute; bottom:0; right:5px; }
+</style>
+<script src="data.js"></script>
+<script>
+function connector_mouseover(e)
+{
+	if(!document.getElementById('opt_zoom_mouseover').checked)
+		return;
+	
+	id=e.originalTarget.id;
+	
+	re=id.match(/^pin_(\d)_(\d+)/);
+	var con;
+	if(re)
+		con=re[1];
+	else
+	{
+		re=id.match(/^outline_(\d)/)
+		if(!re)
+			return;
+		con=re[1];
+	}
+	
+	document.getElementById('title_connector_zoom').innerHTML='Connector '+con;
+	
+	pos_pin1=connectors.get(con).get('pos_pin1');
+	
+	var id_zoom;
+	var id_element;
+	var pin_mapping;
+	
+	if(connectors.get(con).get('orientation')=='horiz')
+	{
+		id_zoom='con_zoom_horiz';
+		id_element='h';
+		//pos_pin1 is top_right or bottom_left for this board
+		if(pos_pin1=='top_right')
+		{
+			pin_mapping=[15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 30, 29, 28, 27, 26, 25, 24, 23, 22, 21, 20, 19, 18, 17, 16];
+		}
+		else
+		{
+			pin_mapping=[30, 29, 28, 27, 26, 25, 24, 23, 22, 21, 20, 19, 18, 17, 16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1];
+		}
+	}
+	else
+	{
+		id_zoom='con_zoom_vert';
+		id_element='v';
+		//pos_pin1 always top_left for this board
+		pin_mapping=[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30];
+	}
+	
+	for(i=1; i<=30; i++)
+		document.getElementById('td_'+id_element+'_'+pin_mapping[i-1]).innerHTML=connectors.get(con).get(i.toString()).get('connected_to').replace(/.+?:/, '');
+	
+	document.getElementById('title_connector_zoom').style='';
+	document.getElementById(id_zoom).style='';
+}
+
+function connector_mouseout(e)
+{	
+	document.getElementById('title_connector_zoom').style='display:none;';
+	document.getElementById('con_zoom_horiz').style='display:none;';
+	document.getElementById('con_zoom_vert').style='display:none;';
+}
+
+var highlighted=new Array();
+
+function highlight_pin(con, pin)
+{
+	highlighted.push([['con', con], ['pin', pin]]);
+	document.getElementById('pin_'+con+'_'+pin).style='stroke-width:4px;';
+}
+
+function remove_highlight_pin(con, pin)
+{
+	document.getElementById('pin_'+con+'_'+pin).style='';
+}
+
+function reset_highlight()
+{
+	for(item of highlighted)
+	{
+		m=new Map(item);
+		remove_highlight_pin(m.get('con'), m.get('pin'));
+	}
+}
+
+function boardview_click(e)
+{
+	id=e.originalTarget.id;
+	
+	re=id.match(/^pin_(\d)_(\d+)/);
+	if(!re)
+		return;
+	
+	con=re[1];
+	pin=re[2];
+	
+	reset_highlight();
+	
+	highlight_pin(con, pin);
+	
+	type=connectors.get(con).get(pin).get('type');	
+	connected_to=connectors.get(con).get(pin).get('connected_to');
+	
+	document.getElementById('dtl_con_nb').innerHTML=con;
+	document.getElementById('dtl_pin_nb').innerHTML=pin;
+	document.getElementById('dtl_connected_to').innerHTML=connected_to;
+	
+	is_diff=connectors.get(con).get(pin).get('is_diff_pair');
+	if(is_diff=='true')
+	{
+		for(item of document.getElementsByClassName('diff_more'))
+			item.style='';
+		
+		diff_type=connectors.get(con).get(pin).get('diff_pair_data').get('type');
+		pin_fpga_compl=connectors.get(con).get(pin).get('diff_pair_data').get('pin_fpga_complement');
+		con_compl=connectors.get(con).get(pin).get('diff_pair_data').get('connector_complement');
+		pin_compl=connectors.get(con).get(pin).get('diff_pair_data').get('pin_complement');
+		
+		document.getElementById('dtl_pin_diff').innerHTML='yes';
+		
+		if(diff_type=='DIFF_TRUE')
+			document.getElementById('dtl_diff_pin_func').innerHTML='diff P';
+		else
+			document.getElementById('dtl_diff_pin_func').innerHTML='diff N';
+		
+		document.getElementById('dtl_diff_second_con').innerHTML=con_compl;
+		document.getElementById('dtl_diff_second_pin').innerHTML=pin_compl;
+		document.getElementById('dtl_diff_second_fpga').innerHTML='FPGA: '+pin_fpga_compl;
+		
+		if(document.getElementById('opt_highlight_diff').checked && con_compl!='NC')
+			highlight_pin(con_compl, pin_compl);
+	}
+	else
+	{
+		for(item of document.getElementsByClassName('diff_more'))
+			item.style='display:none;';
+		//let's reset those so in case something goes wrong with another pin there won't be any false informations there
+		document.getElementById('dtl_pin_diff').innerHTML='no';
+		document.getElementById('dtl_diff_pin_func').innerHTML='---';
+		document.getElementById('dtl_diff_second_con').innerHTML='---';
+		document.getElementById('dtl_diff_second_pin').innerHTML='---';
+		document.getElementById('dtl_diff_second_fpga').innerHTML='---';
+	}
+}
+
+</script>
+</head>
+
+<body>
+	<div class="main">
+		<div class="header">
+			Pinviewer for external Board for Colorlight i9 v7.2 - ALPHA VERSION! - INCOMPLETE! - Feedback welcome
+			<noscript><div class="js_off">Javascript is needed for this tool!</div></noscript>
+		</div>
+		<div class="left">
+			<div class="board">
+				<!-- SVG AUTOGENERATED ON Tue Mar 12 19:11:38 2024 - DO NOT EDIT! -->
+				<svg id="boardview" width="1000pt" height="800pt" viewBox="0 0 1002 802" version="1.2" xmlns="http://www.w3.org/2000/svg" xmlns:svg="http://www.w3.org/2000/svg">
+					<style>
+						.board { stroke:#000000; fill:#ffffff; stroke-width:2; }
+						.outline { stroke:#6a6a6a; fill:none; stroke-width:1; }
+						.pin_nc { stroke:none; fill:#a0a0a0; }
+						.pin_gnd { stroke:none; fill:#000000; }
+						.pin_33v { stroke:none; fill:#ff0000; }
+						.pin_5v { stroke:none; fill:#ffff00; }
+						.pin { stroke:#000000; stroke-width:1; fill:#ffffff; }
+						.pin_eth { stroke:none; fill:#00ff00; }
+						.con_USB_HDMI { stroke:#000000; stroke-width:0.5; fill:none; }
+						.con_USB_HDMI_text { stroke:none; fill:#000000; text-anchor:middle; font-family:sans-serif; font-size:10pt; }
+						.con_number_horiz { stroke:#000000; fill:#000000; text-anchor:middle; font-family:sans-serif; font-size:20pt; }
+						.con_number_vert { stroke:#000000; fill:#000000; font-family:sans-serif; font-size:20pt; }
+					</style>
+
+					<rect class="board" x="0" y="0" width="1000" height="800" />
+
+					<rect class="con_USB_HDMI" x="455" y="720" width="90" height="70" />
+					<text class="con_USB_HDMI_text" x="500" y="760">USB</text>
+					
+					<rect class="con_USB_HDMI" x="455" y="15" width="90" height="70" />
+					<text class="con_USB_HDMI_text" x="500" y="55">HDMI</text>
+					
+					<g id="con_1">
+						<rect class="outline" id="outline_1" x="925" y="210" width="55" height="380" />
+						<text class="con_number_vert" x="895" y="400">1</text>
+						<g id="pins_1">
+							<rect class="pin_eth" id="pin_1_1" x="930" y="215" width="20" height="20" />
+							<circle class="pin_eth" id="pin_1_2" cx="940" cy="250" r="10" />
+							<circle class="pin_eth" id="pin_1_3" cx="940" cy="275" r="10" />
+							<circle class="pin_eth" id="pin_1_4" cx="940" cy="300" r="10" />
+							<circle class="pin_gnd" id="pin_1_5" cx="940" cy="325" r="10" />
+							<circle class="pin_33v" id="pin_1_6" cx="940" cy="350" r="10" />
+							<circle class="pin_nc" id="pin_1_7" cx="940" cy="375" r="10" />
+							<circle class="pin_5v" id="pin_1_8" cx="940" cy="400" r="10" />
+							<circle class="pin_nc" id="pin_1_9" cx="940" cy="425" r="10" />
+							<circle class="pin_eth" id="pin_1_10" cx="940" cy="450" r="10" />
+							<circle class="pin_eth" id="pin_1_11" cx="940" cy="475" r="10" />
+							<circle class="pin_eth" id="pin_1_12" cx="940" cy="500" r="10" />
+							<circle class="pin_eth" id="pin_1_13" cx="940" cy="525" r="10" />
+							<circle class="pin_gnd" id="pin_1_14" cx="940" cy="550" r="10" />
+							<circle class="pin_33v" id="pin_1_15" cx="940" cy="575" r="10" />
+							<circle class="pin_33v" id="pin_1_16" cx="965" cy="575" r="10" />
+							<circle class="pin_gnd" id="pin_1_17" cx="965" cy="550" r="10" />
+							<circle class="pin_eth" id="pin_1_18" cx="965" cy="525" r="10" />
+							<circle class="pin_eth" id="pin_1_19" cx="965" cy="500" r="10" />
+							<circle class="pin_eth" id="pin_1_20" cx="965" cy="475" r="10" />
+							<circle class="pin_eth" id="pin_1_21" cx="965" cy="450" r="10" />
+							<circle class="pin_nc" id="pin_1_22" cx="965" cy="425" r="10" />
+							<circle class="pin_gnd" id="pin_1_23" cx="965" cy="400" r="10" />
+							<circle class="pin_nc" id="pin_1_24" cx="965" cy="375" r="10" />
+							<circle class="pin_33v" id="pin_1_25" cx="965" cy="350" r="10" />
+							<circle class="pin_gnd" id="pin_1_26" cx="965" cy="325" r="10" />
+							<circle class="pin_eth" id="pin_1_27" cx="965" cy="300" r="10" />
+							<circle class="pin_eth" id="pin_1_28" cx="965" cy="275" r="10" />
+							<circle class="pin_eth" id="pin_1_29" cx="965" cy="250" r="10" />
+							<circle class="pin_eth" id="pin_1_30" cx="965" cy="225" r="10" />
+						</g>
+					</g>
+
+					<g id="con_2">
+						<rect class="outline" id="outline_2" x="572.5" y="20" width="380" height="55" />
+						<text class="con_number_horiz" x="762.5" y="105">2</text>
+						<g id="pins_2">
+							<rect class="pin_33v" id="pin_2_1" x="927.5" y="25" width="20" height="20" />
+							<circle class="pin_gnd" id="pin_2_2" cx="912.5" cy="35" r="10" />
+							<circle class="pin" id="pin_2_3" cx="887.5" cy="35" r="10" />
+							<circle class="pin" id="pin_2_4" cx="862.5" cy="35" r="10" />
+							<circle class="pin" id="pin_2_5" cx="837.5" cy="35" r="10" />
+							<circle class="pin" id="pin_2_6" cx="812.5" cy="35" r="10" />
+							<circle class="pin" id="pin_2_7" cx="787.5" cy="35" r="10" />
+							<circle class="pin_gnd" id="pin_2_8" cx="762.5" cy="35" r="10" />
+							<circle class="pin" id="pin_2_9" cx="737.5" cy="35" r="10" />
+							<circle class="pin_33v" id="pin_2_10" cx="712.5" cy="35" r="10" />
+							<circle class="pin_gnd" id="pin_2_11" cx="687.5" cy="35" r="10" />
+							<circle class="pin" id="pin_2_12" cx="662.5" cy="35" r="10" />
+							<circle class="pin" id="pin_2_13" cx="637.5" cy="35" r="10" />
+							<circle class="pin" id="pin_2_14" cx="612.5" cy="35" r="10" />
+							<circle class="pin" id="pin_2_15" cx="587.5" cy="35" r="10" />
+							<circle class="pin" id="pin_2_16" cx="587.5" cy="60" r="10" />
+							<circle class="pin" id="pin_2_17" cx="612.5" cy="60" r="10" />
+							<circle class="pin" id="pin_2_18" cx="637.5" cy="60" r="10" />
+							<circle class="pin" id="pin_2_19" cx="662.5" cy="60" r="10" />
+							<circle class="pin_gnd" id="pin_2_20" cx="687.5" cy="60" r="10" />
+							<circle class="pin_33v" id="pin_2_21" cx="712.5" cy="60" r="10" />
+							<circle class="pin" id="pin_2_22" cx="737.5" cy="60" r="10" />
+							<circle class="pin_5v" id="pin_2_23" cx="762.5" cy="60" r="10" />
+							<circle class="pin" id="pin_2_24" cx="787.5" cy="60" r="10" />
+							<circle class="pin" id="pin_2_25" cx="812.5" cy="60" r="10" />
+							<circle class="pin" id="pin_2_26" cx="837.5" cy="60" r="10" />
+							<circle class="pin" id="pin_2_27" cx="862.5" cy="60" r="10" />
+							<circle class="pin" id="pin_2_28" cx="887.5" cy="60" r="10" />
+							<circle class="pin_gnd" id="pin_2_29" cx="912.5" cy="60" r="10" />
+							<circle class="pin_33v" id="pin_2_30" cx="937.5" cy="60" r="10" />
+						</g>
+					</g>
+
+					<g id="con_3">
+						<rect class="outline" id="outline_3" x="47.5" y="20" width="380" height="55" />
+						<text class="con_number_horiz" x="237.5" y="105">3</text>
+						<g id="pins_3">
+							<rect class="pin_33v" id="pin_3_1" x="402.5" y="25" width="20" height="20" />
+							<circle class="pin_gnd" id="pin_3_2" cx="387.5" cy="35" r="10" />
+							<circle class="pin" id="pin_3_3" cx="362.5" cy="35" r="10" />
+							<circle class="pin" id="pin_3_4" cx="337.5" cy="35" r="10" />
+							<circle class="pin" id="pin_3_5" cx="312.5" cy="35" r="10" />
+							<circle class="pin" id="pin_3_6" cx="287.5" cy="35" r="10" />
+							<circle class="pin" id="pin_3_7" cx="262.5" cy="35" r="10" />
+							<circle class="pin_gnd" id="pin_3_8" cx="237.5" cy="35" r="10" />
+							<circle class="pin" id="pin_3_9" cx="212.5" cy="35" r="10" />
+							<circle class="pin_33v" id="pin_3_10" cx="187.5" cy="35" r="10" />
+							<circle class="pin_gnd" id="pin_3_11" cx="162.5" cy="35" r="10" />
+							<circle class="pin" id="pin_3_12" cx="137.5" cy="35" r="10" />
+							<circle class="pin" id="pin_3_13" cx="112.5" cy="35" r="10" />
+							<circle class="pin" id="pin_3_14" cx="87.5" cy="35" r="10" />
+							<circle class="pin" id="pin_3_15" cx="62.5" cy="35" r="10" />
+							<circle class="pin" id="pin_3_16" cx="62.5" cy="60" r="10" />
+							<circle class="pin" id="pin_3_17" cx="87.5" cy="60" r="10" />
+							<circle class="pin" id="pin_3_18" cx="112.5" cy="60" r="10" />
+							<circle class="pin" id="pin_3_19" cx="137.5" cy="60" r="10" />
+							<circle class="pin_gnd" id="pin_3_20" cx="162.5" cy="60" r="10" />
+							<circle class="pin_33v" id="pin_3_21" cx="187.5" cy="60" r="10" />
+							<circle class="pin" id="pin_3_22" cx="212.5" cy="60" r="10" />
+							<circle class="pin_5v" id="pin_3_23" cx="237.5" cy="60" r="10" />
+							<circle class="pin" id="pin_3_24" cx="262.5" cy="60" r="10" />
+							<circle class="pin" id="pin_3_25" cx="287.5" cy="60" r="10" />
+							<circle class="pin" id="pin_3_26" cx="312.5" cy="60" r="10" />
+							<circle class="pin" id="pin_3_27" cx="337.5" cy="60" r="10" />
+							<circle class="pin" id="pin_3_28" cx="362.5" cy="60" r="10" />
+							<circle class="pin_gnd" id="pin_3_29" cx="387.5" cy="60" r="10" />
+							<circle class="pin_33v" id="pin_3_30" cx="412.5" cy="60" r="10" />
+						</g>
+					</g>
+
+					<g id="con_4">
+						<rect class="outline" id="outline_4" x="20" y="210" width="55" height="380" />
+						<text class="con_number_vert" x="85" y="400">4</text>
+						<g id="pins_4">
+							<rect class="pin_33v" id="pin_4_1" x="25" y="215" width="20" height="20" />
+							<circle class="pin_gnd" id="pin_4_2" cx="35" cy="250" r="10" />
+							<circle class="pin" id="pin_4_3" cx="35" cy="275" r="10" />
+							<circle class="pin" id="pin_4_4" cx="35" cy="300" r="10" />
+							<circle class="pin" id="pin_4_5" cx="35" cy="325" r="10" />
+							<circle class="pin" id="pin_4_6" cx="35" cy="350" r="10" />
+							<circle class="pin" id="pin_4_7" cx="35" cy="375" r="10" />
+							<circle class="pin_gnd" id="pin_4_8" cx="35" cy="400" r="10" />
+							<circle class="pin" id="pin_4_9" cx="35" cy="425" r="10" />
+							<circle class="pin_33v" id="pin_4_10" cx="35" cy="450" r="10" />
+							<circle class="pin_gnd" id="pin_4_11" cx="35" cy="475" r="10" />
+							<circle class="pin" id="pin_4_12" cx="35" cy="500" r="10" />
+							<circle class="pin" id="pin_4_13" cx="35" cy="525" r="10" />
+							<circle class="pin" id="pin_4_14" cx="35" cy="550" r="10" />
+							<circle class="pin_nc" id="pin_4_15" cx="35" cy="575" r="10" />
+							<circle class="pin_nc" id="pin_4_16" cx="60" cy="575" r="10" />
+							<circle class="pin" id="pin_4_17" cx="60" cy="550" r="10" />
+							<circle class="pin" id="pin_4_18" cx="60" cy="525" r="10" />
+							<circle class="pin" id="pin_4_19" cx="60" cy="500" r="10" />
+							<circle class="pin_gnd" id="pin_4_20" cx="60" cy="475" r="10" />
+							<circle class="pin_33v" id="pin_4_21" cx="60" cy="450" r="10" />
+							<circle class="pin" id="pin_4_22" cx="60" cy="425" r="10" />
+							<circle class="pin_5v" id="pin_4_23" cx="60" cy="400" r="10" />
+							<circle class="pin" id="pin_4_24" cx="60" cy="375" r="10" />
+							<circle class="pin" id="pin_4_25" cx="60" cy="350" r="10" />
+							<circle class="pin" id="pin_4_26" cx="60" cy="325" r="10" />
+							<circle class="pin" id="pin_4_27" cx="60" cy="300" r="10" />
+							<circle class="pin" id="pin_4_28" cx="60" cy="275" r="10" />
+							<circle class="pin_gnd" id="pin_4_29" cx="60" cy="250" r="10" />
+							<circle class="pin_33v" id="pin_4_30" cx="60" cy="225" r="10" />
+						</g>
+					</g>
+
+					<g id="con_5">
+						<rect class="outline" id="outline_5" x="47.5" y="725" width="380" height="55" />
+						<text class="con_number_horiz" x="237.5" y="715">5</text>
+						<g id="pins_5">
+							<rect class="pin_33v" id="pin_5_1" x="52.5" y="755" width="20" height="20" />
+							<circle class="pin_gnd" id="pin_5_2" cx="87.5" cy="765" r="10" />
+							<circle class="pin" id="pin_5_3" cx="112.5" cy="765" r="10" />
+							<circle class="pin" id="pin_5_4" cx="137.5" cy="765" r="10" />
+							<circle class="pin" id="pin_5_5" cx="162.5" cy="765" r="10" />
+							<circle class="pin" id="pin_5_6" cx="187.5" cy="765" r="10" />
+							<circle class="pin" id="pin_5_7" cx="212.5" cy="765" r="10" />
+							<circle class="pin_gnd" id="pin_5_8" cx="237.5" cy="765" r="10" />
+							<circle class="pin" id="pin_5_9" cx="262.5" cy="765" r="10" />
+							<circle class="pin_33v" id="pin_5_10" cx="287.5" cy="765" r="10" />
+							<circle class="pin_gnd" id="pin_5_11" cx="312.5" cy="765" r="10" />
+							<circle class="pin" id="pin_5_12" cx="337.5" cy="765" r="10" />
+							<circle class="pin" id="pin_5_13" cx="362.5" cy="765" r="10" />
+							<circle class="pin" id="pin_5_14" cx="387.5" cy="765" r="10" />
+							<circle class="pin" id="pin_5_15" cx="412.5" cy="765" r="10" />
+							<circle class="pin" id="pin_5_16" cx="412.5" cy="740" r="10" />
+							<circle class="pin" id="pin_5_17" cx="387.5" cy="740" r="10" />
+							<circle class="pin" id="pin_5_18" cx="362.5" cy="740" r="10" />
+							<circle class="pin" id="pin_5_19" cx="337.5" cy="740" r="10" />
+							<circle class="pin_gnd" id="pin_5_20" cx="312.5" cy="740" r="10" />
+							<circle class="pin_33v" id="pin_5_21" cx="287.5" cy="740" r="10" />
+							<circle class="pin" id="pin_5_22" cx="262.5" cy="740" r="10" />
+							<circle class="pin_5v" id="pin_5_23" cx="237.5" cy="740" r="10" />
+							<circle class="pin" id="pin_5_24" cx="212.5" cy="740" r="10" />
+							<circle class="pin" id="pin_5_25" cx="187.5" cy="740" r="10" />
+							<circle class="pin" id="pin_5_26" cx="162.5" cy="740" r="10" />
+							<circle class="pin" id="pin_5_27" cx="137.5" cy="740" r="10" />
+							<circle class="pin" id="pin_5_28" cx="112.5" cy="740" r="10" />
+							<circle class="pin_gnd" id="pin_5_29" cx="87.5" cy="740" r="10" />
+							<circle class="pin_33v" id="pin_5_30" cx="62.5" cy="740" r="10" />
+						</g>
+					</g>
+
+					<g id="con_6">
+						<rect class="outline" id="outline_6" x="572.5" y="725" width="380" height="55" />
+						<text class="con_number_horiz" x="762.5" y="715">6</text>
+						<g id="pins_6">
+							<rect class="pin_33v" id="pin_6_1" x="577.5" y="755" width="20" height="20" />
+							<circle class="pin_gnd" id="pin_6_2" cx="612.5" cy="765" r="10" />
+							<circle class="pin" id="pin_6_3" cx="637.5" cy="765" r="10" />
+							<circle class="pin" id="pin_6_4" cx="662.5" cy="765" r="10" />
+							<circle class="pin" id="pin_6_5" cx="687.5" cy="765" r="10" />
+							<circle class="pin" id="pin_6_6" cx="712.5" cy="765" r="10" />
+							<circle class="pin" id="pin_6_7" cx="737.5" cy="765" r="10" />
+							<circle class="pin_gnd" id="pin_6_8" cx="762.5" cy="765" r="10" />
+							<circle class="pin" id="pin_6_9" cx="787.5" cy="765" r="10" />
+							<circle class="pin_33v" id="pin_6_10" cx="812.5" cy="765" r="10" />
+							<circle class="pin_gnd" id="pin_6_11" cx="837.5" cy="765" r="10" />
+							<circle class="pin" id="pin_6_12" cx="862.5" cy="765" r="10" />
+							<circle class="pin" id="pin_6_13" cx="887.5" cy="765" r="10" />
+							<circle class="pin" id="pin_6_14" cx="912.5" cy="765" r="10" />
+							<circle class="pin" id="pin_6_15" cx="937.5" cy="765" r="10" />
+							<circle class="pin" id="pin_6_16" cx="937.5" cy="740" r="10" />
+							<circle class="pin" id="pin_6_17" cx="912.5" cy="740" r="10" />
+							<circle class="pin" id="pin_6_18" cx="887.5" cy="740" r="10" />
+							<circle class="pin" id="pin_6_19" cx="862.5" cy="740" r="10" />
+							<circle class="pin_gnd" id="pin_6_20" cx="837.5" cy="740" r="10" />
+							<circle class="pin_33v" id="pin_6_21" cx="812.5" cy="740" r="10" />
+							<circle class="pin" id="pin_6_22" cx="787.5" cy="740" r="10" />
+							<circle class="pin_5v" id="pin_6_23" cx="762.5" cy="740" r="10" />
+							<circle class="pin" id="pin_6_24" cx="737.5" cy="740" r="10" />
+							<circle class="pin" id="pin_6_25" cx="712.5" cy="740" r="10" />
+							<circle class="pin" id="pin_6_26" cx="687.5" cy="740" r="10" />
+							<circle class="pin" id="pin_6_27" cx="662.5" cy="740" r="10" />
+							<circle class="pin" id="pin_6_28" cx="637.5" cy="740" r="10" />
+							<circle class="pin_gnd" id="pin_6_29" cx="612.5" cy="740" r="10" />
+							<circle class="pin_33v" id="pin_6_30" cx="587.5" cy="740" r="10" />
+						</g>
+					</g>
+				</svg>
+				<div class="con_macro">
+					<div class="title" id="title_connector_zoom" style="display:none;">Connector-Zoom</div>
+					<div id="con_zoom_horiz" style="display:none;">
+						<table class="con_zoom_table">
+							<tr><td id="td_h_1">1</td><td id="td_h_2">2</td><td id="td_h_3">3</td><td id="td_h_4">4</td><td id="td_h_5">5</td><td id="td_h_6">6</td><td id="td_h_7">7</td><td id="td_h_8">8</td><td id="td_h_9">9</td><td id="td_h_10">10</td><td id="td_h_11">11</td><td id="td_h_12">12</td><td id="td_h_13">13</td><td id="td_h_14">14</td><td id="td_h_15">15</td></tr>
+							<tr><td id="td_h_30">30</td><td id="td_h_29">29</td><td id="td_h_28">28</td><td id="td_h_27">27</td><td id="td_h_26">26</td><td id="td_h_25">25</td><td id="td_h_24">24</td><td id="td_h_23">23</td><td id="td_h_22">22</td><td id="td_h_21">21</td><td id="td_h_20">20</td><td id="td_h_19">19</td><td id="td_h_18">18</td><td id="td_h_17">17</td><td id="td_h_16">16</td></tr>
+						</table>
+					</div>
+					<div id="con_zoom_vert" style="display:none;">
+						<table class="con_zoom_table">
+							<tr><td id="td_v_1">1</td><td id="td_v_30">30</td></tr>
+							<tr><td id="td_v_2">2</td><td id="td_v_29">29</td></tr>
+							<tr><td id="td_v_3">3</td><td id="td_v_28">28</td></tr>
+							<tr><td id="td_v_4">4</td><td id="td_v_27">27</td></tr>
+							<tr><td id="td_v_5">5</td><td id="td_v_26">26</td></tr>
+							<tr><td id="td_v_6">6</td><td id="td_v_25">25</td></tr>
+							<tr><td id="td_v_7">7</td><td id="td_v_24">24</td></tr>
+							<tr><td id="td_v_8">8</td><td id="td_v_23">23</td></tr>
+							<tr><td id="td_v_9">9</td><td id="td_v_22">22</td></tr>
+							<tr><td id="td_v_10">10</td><td id="td_v_21">21</td></tr>
+							<tr><td id="td_v_11">11</td><td id="td_v_20">20</td></tr>
+							<tr><td id="td_v_12">12</td><td id="td_v_19">19</td></tr>
+							<tr><td id="td_v_13">13</td><td id="td_v_18">18</td></tr>
+							<tr><td id="td_v_14">14</td><td id="td_v_17">17</td></tr>
+							<tr><td id="td_v_15">15</td><td id="td_v_16">16</td></tr>
+						</table>
+					</div>
+				</div>
+			</div>
+			<div>
+				<!-- SVG AUTOGENERATED ON Sun Mar 10 23:35:42 2024 - DO NOT EDIT! -->
+				<svg id="legend" width="1000pt" height="30pt" viewBox="0 0 1001 31" version="1.2" xmlns="http://www.w3.org/2000/svg" xmlns:svg="http://www.w3.org/2000/svg">
+					<style>
+						.legend_outline { stroke:#000000; fill:#ffffff; stroke-width:1; }
+						text { fill:#000000; font-family:sans-serif; font-size:15pt; }
+						.pin_nc { stroke:none; fill:#a0a0a0; }
+						.pin_33v { stroke:none; fill:#ff0000; }
+						.pin_5v { stroke:none; fill:#ffff00; }
+						.pin { stroke:#000000; stroke-width:1; fill:#ffffff; }
+						.pin_eth { stroke:none; fill:#00ff00; }
+					</style>
+
+					<rect class="legend_outline" x="0" y="0" width="1000" height="30" />
+
+					<circle class="pin_nc" cx="20" cy="15" r="10" />
+					<text x="35" y="22">not connected</text>
+					<circle class="pin_33v" cx="220" cy="15" r="10" />
+					<text x="235" y="22">3,3V</text>
+					<circle class="pin_5v" cx="420" cy="15" r="10" />
+					<text x="435" y="22">5V</text>
+					<circle class="pin" cx="620" cy="15" r="10" />
+					<text x="635" y="22">FPGA-Pin</text>
+					<circle class="pin_eth" cx="820" cy="15" r="10" />
+					<text x="835" y="22">Ethernet-PHY</text>
+				</svg>
+			</div>
+		</div>
+		<div class="right">
+			<div class="details">
+				<div class="title">Details:</div>
+				<table>
+					<tr><td>Connector:</td><td id="dtl_con_nb">---</td></tr>
+					<tr><td>Pin:</td><td id="dtl_pin_nb">---</td></tr>
+					<tr><td>Connected to:</td><td id="dtl_connected_to">---</td></tr>
+					<tr><td>Differential:</td><td id="dtl_pin_diff">---</td></tr>
+					<tr class="diff_more" style="display:none;"><td>This Pin:</td><td id="dtl_diff_pin_func">---</td></tr>
+					<tr class="diff_more" style="display:none;"><td>Paired Pin:</td><td>
+						<table class="table_diff_details">
+							<tr><td>Connector:</td><td id="dtl_diff_second_con">---</td></tr>
+							<tr><td>Pin:</td><td id="dtl_diff_second_pin">---</td></tr>
+							<tr><td>Connected to:</td><td id="dtl_diff_second_fpga">---</td></tr>
+						</table>
+					</td></tr>
+				</table>
+			</div>
+			<div class="control">
+				<div class="title">Options:</div>
+				<form>
+					<input type="checkbox" id="opt_zoom_mouseover"><label for="opt_zoom_mouseover">"zoom" on mouse over connector</label></br>
+					<input type="checkbox" id="opt_highlight_diff"><label for="opt_highlight_diff">highlight differential-pairs</label>
+				</form>
+			</div>
+		</div>
+	</div>
+	<div class="footer">
+		<p>&copy; 2024 by <a href="https://github.com/kittennbfive">kittennbfive</a> - CC BY-NC-SA 4.0</p>
+	</div>
+</body>
+
+<script>
+var i;
+for(i=1; i<=6; i++)
+{
+	document.getElementById('boardview').getElementById('con_'+i).addEventListener('mouseover', connector_mouseover);
+	document.getElementById('boardview').getElementById('con_'+i).addEventListener('mouseout', connector_mouseout);
+}
+document.getElementById('boardview').addEventListener('click', boardview_click);
+</script>
+
+</html>
