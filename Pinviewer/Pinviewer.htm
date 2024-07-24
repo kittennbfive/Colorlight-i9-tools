@@ -4,9 +4,8 @@
 
 <!--
 Pinviewer for external Board for Colorlight i9 v7.2
-ALPHA VERSION! - INCOMPLETE! - Feedback welcome
 
-(c) 2024 by kittennbfive - CC BY-NC-SA 4.0
+(c) 2024 by kittennbfive - CC BY-NC-SA 4.0 - NO WARRANTY! - Feedback welcome!
 
 https://github.com/kittennbfive
 -->
@@ -135,6 +134,8 @@ function boardview_click(e)
 	
 	type=connectors.get(con).get(pin).get('type');	
 	connected_to=connectors.get(con).get(pin).get('connected_to');
+	dual_func=connectors.get(con).get(pin).get('dual_func');
+	extra_connection=connectors.get(con).get(pin).get('extra_conn');
 	
 	document.getElementById('dtl_con_nb').innerHTML=con;
 	document.getElementById('dtl_pin_nb').innerHTML=pin;
@@ -176,6 +177,9 @@ function boardview_click(e)
 		document.getElementById('dtl_diff_second_pin').innerHTML='---';
 		document.getElementById('dtl_diff_second_fpga').innerHTML='---';
 	}
+	
+	document.getElementById('dtl_dual_func').innerHTML=dual_func;
+	document.getElementById('dtl_extra_conn').innerHTML=extra_connection;
 }
 
 </script>
@@ -184,7 +188,7 @@ function boardview_click(e)
 <body>
 	<div class="main">
 		<div class="header">
-			Pinviewer for external Board for Colorlight i9 v7.2 - ALPHA VERSION! - INCOMPLETE! - Feedback welcome
+			Pinviewer for external Board for Colorlight i9 v7.2
 			<noscript><div class="js_off">Javascript is needed for this tool!</div></noscript>
 		</div>
 		<div class="left">
@@ -509,6 +513,8 @@ function boardview_click(e)
 							<tr><td>Connected to:</td><td id="dtl_diff_second_fpga">---</td></tr>
 						</table>
 					</td></tr>
+					<tr><td>Dual function (inside FPGA):</td><td id="dtl_dual_func">---</td></tr>
+					<tr><td>Also connected to:</td><td id="dtl_extra_conn">---</td></tr>
 				</table>
 			</div>
 			<div class="control">
@@ -521,7 +527,7 @@ function boardview_click(e)
 		</div>
 	</div>
 	<div class="footer">
-		<p>&copy; 2024 by <a href="https://github.com/kittennbfive">kittennbfive</a> - CC BY-NC-SA 4.0</p>
+		<p>&copy; 2024 by <a href="https://github.com/kittennbfive">kittennbfive</a> - CC BY-NC-SA 4.0 - NO WARRANTY!</p>
 	</div>
 </body>
 
